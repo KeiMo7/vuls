@@ -1,0 +1,51 @@
+{
+  "scannedServers": 3,
+  "skippedServers": 1,
+  "skippedCves": 2,
+  "cves": [
+    {
+      "cveID": "CVE-2026-0001",
+      "severity": "CRITICAL",
+      "cvss40Score": 9.8,
+      "cvss3Score": 9.1,
+      "cvss2Score": 7.5,
+      "hostCount": 2,
+      "affectedServers": [
+        "host-a",
+        "host-b"
+      ],
+      "affectedFamilies": [
+        "debian",
+        "ubuntu"
+      ],
+      "occurrences": [
+        {
+          "server": "host-a",
+          "family": "ubuntu",
+          "release": "24.04",
+          "package": "curl",
+          "fixedIn": "8.0",
+          "notFixedYet": false,
+          "fixState": "fixed"
+        }
+      ],
+      "sourceTypes": [
+        "nvd"
+      ],
+      "sourceLinks": [
+        "https://example.test/cve"
+      ],
+      "kevTypes": [
+        "cisa",
+        "enisa"
+      ],
+      "exploitCount": 2,
+      "metasploitCount": 1,
+      "advisoryIDs": [
+        "ADV-1"
+      ],
+      "allUnfixed": false,
+      "vulnType": "remote"
+    }
+  ]
+}

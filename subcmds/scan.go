@@ -24,6 +24,9 @@ type ScanCmd struct {
 	scanTimeoutSec int
 	cacheDBPath    string
 	detectIPS      bool
+	concurrency    int
+	scanRetry      int
+	timeoutPerHost int
 }
 
 // Name return subcommand name
@@ -44,6 +47,9 @@ func (*ScanCmd) Usage() string {
 		[-http-proxy=http://192.168.0.1:8080]
 		[-timeout=300]
 		[-timeout-scan=7200]
+		[-concurrency=0]
+		[-scan-retry=1]
+		[-timeout-per-host=0]
 		[-debug]
 		[-quiet]
 		[-pipe]
@@ -88,6 +94,15 @@ func (p *ScanCmd) SetFlags(f *flag.FlagSet) {
 
 	f.IntVar(&p.scanTimeoutSec, "timeout-scan", 120*60,
 		"Number of seconds for scanning vulnerabilities for all servers",
+	)
+	f.IntVar(&p.concurrency, "concurrency", 0,
+		"Number of hosts scanned concurrently through the bounded queue (0 uses the default parallel scanner)",
+	)
+	f.IntVar(&p.scanRetry, "scan-retry", 1,
+		"Maximum scan attempts per host when -concurrency is positive",
+	)
+	f.IntVar(&p.timeoutPerHost, "timeout-per-host", 0,
+		"Number of seconds for one host scan attempt (0 disables the per-host timeout)",
 	)
 }
 
@@ -176,6 +191,9 @@ func (p *ScanCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...any) subcomma
 		LogToFile:      config.Conf.LogToFile,
 		LogDir:         config.Conf.LogDir,
 		DetectIPS:      p.detectIPS,
+		Workers:        p.concurrency,
+		MaxAttempts:    p.scanRetry,
+		TaskTimeoutSec: p.timeoutPerHost,
 	}
 
 	if err := s.Scan(); err != nil {

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -27,6 +28,7 @@ type ReportCmd struct {
 	configPath string
 
 	formatJSON          bool
+	formatDedupJSON     bool
 	formatOneEMail      bool
 	formatCsv           bool
 	formatFullText      bool
@@ -82,6 +84,7 @@ func (*ReportCmd) Usage() string {
 		[-to-s3]
 		[-to-azure-blob]
 		[-format-json]
+		[-format-dedup-json]
 		[-format-one-email]
 		[-format-one-line-text]
 		[-format-list]
@@ -156,6 +159,7 @@ func (p *ReportCmd) SetFlags(f *flag.FlagSet) {
 		"http://proxy-url:port (default: empty)")
 
 	f.BoolVar(&p.formatJSON, "format-json", false, "JSON format")
+	f.BoolVar(&p.formatDedupJSON, "format-dedup-json", false, "Cross-host CVE deduplication JSON format")
 	f.BoolVar(&p.formatCsv, "format-csv", false, "CSV format")
 	f.BoolVar(&p.formatOneEMail, "format-one-email", false,
 		"Send all the host report via only one EMail (Specify with -to-email)")
@@ -246,7 +250,7 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...any) subcom
 		return subcommands.ExitUsageError
 	}
 
-	if !p.formatJSON && !p.formatOneLineText &&
+	if !p.formatJSON && !p.formatDedupJSON && !p.formatOneLineText &&
 		!p.formatList && !p.formatFullText && !p.formatCsv &&
 		!p.formatCycloneDXJSON && !p.formatCycloneDXXML &&
 		!p.formatSPDXJSON {
@@ -259,6 +263,16 @@ func (p *ReportCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...any) subcom
 		return subcommands.ExitFailure
 	}
 	logging.Log.Infof("Loaded: %s", dir)
+
+	if p.formatDedupJSON {
+		out, err := reporter.FormatDedupJSON(models.DedupByCve(loaded))
+		if err != nil {
+			logging.Log.Errorf("Failed to format deduplication JSON: %+v", err)
+			return subcommands.ExitFailure
+		}
+		fmt.Fprint(os.Stdout, out)
+		return subcommands.ExitSuccess
+	}
 
 	var res models.ScanResults
 	hasError := false

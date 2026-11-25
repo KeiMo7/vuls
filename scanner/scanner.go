@@ -21,6 +21,7 @@ import (
 	"github.com/future-architect/vuls/constant"
 	"github.com/future-architect/vuls/logging"
 	"github.com/future-architect/vuls/models"
+	"github.com/future-architect/vuls/scanner/queue"
 	"github.com/future-architect/vuls/util"
 )
 
@@ -84,11 +85,23 @@ type Scanner struct {
 	Quiet          bool
 	DetectIPS      bool
 
+	// Workers bounds concurrent queue scans; zero keeps parallelExec.
+	Workers int
+	// MaxAttempts is the queue retry limit; values below one mean one attempt.
+	MaxAttempts int
+	// TaskTimeoutSec bounds each host attempt when positive.
+	TaskTimeoutSec int
+	// LastReport is the report from the most recent queue-backed scan.
+	LastReport queue.Report
+
 	Targets map[string]config.ServerInfo
 }
 
 // Scan execute scan
-func (s Scanner) Scan() error {
+func (s *Scanner) Scan() error {
+	servers = nil
+	errServers = nil
+
 	logging.Log.Info("Detecting Server/Container OS... ")
 	if err := s.initServers(); err != nil {
 		return xerrors.Errorf("Failed to init servers. err: %w", err)
@@ -925,7 +938,7 @@ func (s Scanner) detectIPS() {
 }
 
 // execScan scan
-func (s Scanner) execScan() error {
+func (s *Scanner) execScan() error {
 	if (len(servers) + len(errServers)) == 0 {
 		return xerrors.New("No server defined. Check the configuration")
 	}
@@ -980,8 +993,8 @@ func (s Scanner) setupChangelogCache() error {
 }
 
 // getScanResults returns ScanResults
-func (s Scanner) getScanResults(scannedAt time.Time) (results models.ScanResults, err error) {
-	parallelExec(func(o osTypeInterface) (err error) {
+func (s *Scanner) getScanResults(scannedAt time.Time) (results models.ScanResults, err error) {
+	scan := func(o osTypeInterface) (err error) {
 		if o.getServerInfo().Module.IsScanOSPkg() {
 			if err = o.preCure(); err != nil {
 				return err
@@ -1010,7 +1023,12 @@ func (s Scanner) getScanResults(scannedAt time.Time) (results models.ScanResults
 			}
 		}
 		return nil
-	}, s.ScanTimeoutSec)
+	}
+	if s.Workers > 0 {
+		s.LastReport = s.scanWithQueue(scan)
+	} else {
+		parallelExec(scan, s.ScanTimeoutSec)
+	}
 	if slices.ContainsFunc([][]osTypeInterface{servers, errServers}, func(ss []osTypeInterface) bool {
 		return slices.ContainsFunc(ss, func(s osTypeInterface) bool { return s.getServerInfo().Module.IsScanLockFile() })
 	}) {
